@@ -1,0 +1,301 @@
+---
+title: "XG(Expected Goal) in Fifaonlie4"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+## 축구게임에서 구해보는 기대득점
+
+
+1. 개요
+
+2. 데이터 탐색
+
+
+---
+
+<br> 
+
+
+### 1.개요
+
+**기대득점이란**
+
+* 현대축구에서 주로 사용되는 축구분석 지표이다.
+
+* 슛을 했을 때 이 슛이 골이 될 확률이 얼마나 되는가를 나타내는 지표로 0~1 사이의 값을 지닌다. 
+예를 들어 하나의 슈팅에 대한 기대득점 수치가 1이라면 이 슈팅은 반드시 골로 이어졌어야 할 슈팅이라는 소리이다.
+
+* 쉽게 생각하면 축구 볼 때 
+  * '와 저걸 못넣어?' - 기대득점이 높은 슈팅인데 못 넣었다.
+  * '와 저걸 넣어?' - 득점을 기대하기 어려운 슈팅인데 넣었다.
+
+ 
+**(실제축구 분석에서)기대득점을 위해 고려되는 주요 요인들**  
+
+    
+* 슛과 골대 사이의 거리
+
+* 슛의 각도
+
+* 슛을 한 몸의 부위 (헤더 , 왼발 , 오른발 , 약발 등)
+
+* 슛을 한 상황 (프리킥 , 오픈-플레이 , 코너킥 , 역습)
+
+* 이전 슛의 시간 (하나의 공격 단위에서 첫 슈팅인가? or 리바운드 슈팅인가 or 앞선 공격으로 수비대형이 붕괴되어있는 상황인가)
+
+* 어시스트의 여부, 종류(예: 땅볼크로스, 얼리크로스 , 스루패스 , 로빙패스 등)
+
+* 드리블 거리 
+
+<br> 
+
+ 
+**피파온라인에서 활용될 수 있는 요인들**  
+  
+* [수치형] 득점 시간(api 데이터에서 0~90분으로 나와있지는 않다) - 이를 통해서 이전 슈팅과의 시간차이를 구할 수 있다.
+
+* [수치형] 슛 x,y 좌표 (골대와의 거리 및 각도 )
+
+* [범주형] 슛 종류 (헤더 , 일반슈팅 , 피네스슛)
+
+* [범주형] 어시스트 여부
+
+* [수치형] 어시스트 x,y 좌표
+
+* 슛의 결과 - 득점 or 안득점
+
+<br> 
+
+
+**게임 데이터에서의 한계**  
+ 
+* open-api 데이터만으로는 슈팅선수의 약발, 스탯(골 결정력 , 헤더 능력 등) 을 알 수 없다. 
+
+* 드리블을 얼마나 했나 절대로 알 수 없다.
+
+* 어시스트의 품질을 절대 알 수 없다 (크로스라면 어떤 형태의 어떤 높이로 올렸나, 스루패스라면 어떤 높이에서 어느정도 강도이며 1:1 찬스를 만들 정도의 좋은 패스였나)
+
+* 어떤 상황에서의 슈팅이었는지 알 수 없다. (프리킥인가, 패널티킥인가, 지공인가 , 역습인가)
+
+
+<br> 
+
+**데이터셋**  
+ 
+* open-api 를 통해 수집한 286361 개의 슈팅데이터
+
+
+**변수**  
+
+* 자체적으로 범주형 변수들을 처리한 상태로 변경하여 수집
+
+
+|변수명|타입|설명|
+|-------|-------|--------------------------------------------|
+|x|double|슛의 x좌표 0~ 1 사이로 1이 골대와 가깝다 현실적으로 0.5 미만일 수 없다.|   
+|y|double|슛의 y좌표 0~1 사이로 0과 1은 각각 좌우측 코너킥 위치 , 0.5가 정중앙이다| 
+|assist|int|어시스트 여부 0 , 1|
+|assistX|double|어시스트의 x좌표 - 어시스트가 없을경우 슛좌표|   
+|assistY|double|어시스트의 y좌표 - 어시스트가 없을경우 슛좌표| 
+|inv|int|이전 슈팅과의 시간차이|
+|nom|int|일반슈팅 0 , 1|
+|fin|int|피네스슈팅 0 , 1|
+|hed|int|헤더슈팅 0 , 1|
+|res|int|득점여부 0 , 1|    
+
+
+<br>  
+
+
+### 데이터 탐색
+
+
+```{r,warning=FALSE,message=FALSE, echo=FALSE}
+
+library(plotly)
+library(reshape2)
+library(corrplot)
+library(sqldf)
+
+DATA <- read.csv('C:/SHOOTS.csv',header = T);
+```
+
+
+```{r}
+
+str(DATA)
+
+```
+
+<br> 
+
+
+**슛 좌표 x,y 가 0 인 값들이 식별된다. 슛좌표 0.5 미만은 게임 매커니즘 상 나오기 힘들다. 이상치로 판단하고 제거한다.**
+
+
+```{r}
+
+summary(DATA)
+
+```
+
+
+```{r , waring=FALSE , message=FALSE}
+
+par(mfrow=c(2,2))
+
+hist(DATA$x)
+hist(DATA$y)
+hist(DATA$asx)
+hist(DATA$asy)
+
+```
+
+```{r , warning=FALSE , message=FALSE}
+
+dataa <- sqldf("select * from DATA where DATA.x > 0")
+
+```
+
+```{r}
+
+sqldf("select count(*) from dataa where dataa.x < 0.5")
+
+data <- sqldf("select * from dataa where dataa.x >= 0.5")
+```
+
+
+```{r , waring=FALSE , message=FALSE}
+
+#제거 후
+
+summary(data)
+
+par(mfrow=c(2,2))
+
+hist(data$x)
+hist(data$y)
+hist(data$asx)
+hist(data$asy)
+```
+
+
+
+**범주형 변수 확인** 
+
+
+* 득점비율
+
+    * 데이터 불균형은 생각한 것 보다는 심하지 않았다.
+
+```{r,warning=FALSE,message=FALSE, echo=FALSE}
+
+
+labels = c('득점X', '득점O')
+values = c(table(data$res)[1],table(data$res)[2])
+resultplot <- plot_ly(type='pie', labels=labels, values=values, 
+               textinfo='label+percent',
+               insidetextorientation='radial')
+resultplot
+
+```
+
+
+<br> 
+
+
+* 슈팅비율
+
+```{r,warning=FALSE,message=FALSE, echo=FALSE}
+
+all = length(data$fin)
+val = c(table(data$nom)[2] , table(data$hed)[2] , table(data$fin)[2]);
+text = c(paste0(round(data[1]/all*100),'%'), paste0(round(data[2]/all*100),'%') , paste0(round(data[3]/all*100),'%'))
+
+fig <- plot_ly(x = ~val, y = c('일반슈팅  ', '헤더슈팅  ', '피네스슈팅  '), type = 'bar', orientation = 'h', marker = list(color = c('red','blue','green')),text = text, textposition = 'auto')
+
+fig
+```
+
+
+* 상관관계도 
+
+    * 분명히 좌표 x와 y가 골대와 가까울 때 득점일 확률이 높았을 것이다.
+    * x좌표의 경우 1과 가까울수록 골대와 가깝다는 것을 뜻하지만 y좌표의 경우 0~1 사이로 0.5 일 때 가장 가까움을 뜻한다.
+    * 따라서 y좌표를 0.5를 기준으로하여 상관관계를 확인하기로 하였다. ( 0.5 => 1   0.4 => 0.8 , 0.6 => (1-0.6)*2 = 0.8)
+
+```{r}
+
+cordata = data
+cordata$y <- ifelse(cordata$y <= 0.5 ,cordata$y*2 , (1-cordata$y)*2)
+cordata$asy <- ifelse(cordata$asy <= 0.5 ,cordata$asy*2 , (1-cordata$asy)*2)
+hist(cordata$y)
+
+```
+
+
+```{r,warning=FALSE,message=FALSE, echo=FALSE}
+corr<- round(cor(cordata),2)  
+corrplot(corr, method = "color", outline = T, addgrid.col = "darkgray", 
+         order="hclust",
+         cl.pos = "b", tl.col = "indianred4", 
+         tl.cex = 0.5, cl.cex = 0.5, addCoef.col = "white", 
+         number.digits = 2, number.cex = 0.4, 
+         col = colorRampPalette(c("darkred","white","midnightblue"))(100))
+``` 
+ 
+* 득점여부인 res와 어시스트 여부인 assist 는 0.21의 양의 상관관계를 보인다. 
+    * 어시스트가 아닌 골 - 패널티킥 , 혼자 드리블로 몰고가서 슛 , 프리킥
+    * 패널티킥을 제외하고는 모두 골이 되기 힘든 상황임을 보아 어시스트를 받은 슈팅이 어느정도 더 많은 득점으로 연결되었음을 가정할 수 있다.
+
+* x , y 좌표와 득점여부도 각각 0.2 , 0.16 으로 약한 양의 상관관계를 보인다.
+
+* 헤더 슈팅인 hed와 슛 x좌표 , 어시 x좌표도 각각 0.31 ,0.29 로 약한 양의 상관관계를 보인다.  
+    * 이는 헤더슈팅은 골대와 가까운 거리에서 이루어지고 먼 거리에서의 얼리크로스 ,로빙패스보다는 상대 터치라인 부근의 가까운 지역에서의 크로스를 통한 패스로 주로 헤더 슈팅이 이루어지는 현실과 어느정도 일치한다는 것을 설명할 수 있다.
+
+* 이전 슈팅 대비 현재 슈팅의 시간 간격인 inv 가 낮을 수록 득점으로 연결되었을 확률이 높을 것으로 예상했지만 그렇지 않았다.
+범주형으로 n분이내의 inv를 혼란한 상황에서의 (투닥투닥 골) 슈팅이라고 가정하고 관계를 보아도 관련이 없었다.
+
+
+<br>
+
+**슈팅 분포도 -슈팅 1만개**
+
+```{r, warning=FALSE , message=FALSE, echo=FALSE}
+
+data10000 = head(data,10000)
+
+data10000$res = ifelse(data10000$res == 1 , "GOAL", "NOGOAL")
+
+goals = sqldf("select x , y from data10000 where res = 'GOAL'");
+nogoals = sqldf("select x , y from data10000 where res = 'NOGOAL'");
+GOAL <- plot_ly(data = goals, x = ~x, y = ~y , name='GOAL') %>% layout(plot_bgcolor ='green',xaxis=list(showgrid =FALSE,showticklabels=FALSE) , yaxis=list(showgrid=FALSE,showticklabels=FALSE) , 
+                                                                           shapes = list(list(layer='below',type='line',              x0=1,x1=0.825,y0=0.2,y1=0.2, line=list(color='white')), list(layer='below',type='line',x0=1,x1=0.825,y0=0.8,y1=0.8,line=list(color='white')),
+list(layer='below' , type='line',x0=0.4,x1=1,y0=1,y1=1,line=list(color='white')),
+list(layer='below' , type='line',x0=0.4,x1=1,y0=0,y1=0,line=list(color='white')),
+list(layer='below' , type='line',x0=1,x1=1,y0=0,y1=1,line=list(color='white')),
+list(layer='below' , type='line',x0=0.825,x1=0.825,y0=0.2,y1=0.8,line=list(color='white')),
+list(layer='below' , type='line',x0=0.5,x1=0.5,y0=0,y1=1,line=list(color='white')),
+list(layer='below' , type='circle',x0=0.45,x1=0.55,y0=0.4,y1=0.6,line=list(color='white'))
+))
+
+NOGOAL <- plot_ly(data = nogoals, x = ~x, y = ~y,name='NOGOAL') %>% layout(plot_bgcolor ='green',xaxis=list(showgrid =FALSE,showticklabels=FALSE) , yaxis=list(showgrid=FALSE,showticklabels=FALSE) , 
+                                                                           shapes = list(list(layer='below',type='line',              x0=1,x1=0.825,y0=0.2,y1=0.2, line=list(color='white')), list(layer='below',type='line',x0=1,x1=0.825,y0=0.8,y1=0.8,line=list(color='white')),
+list(layer='below' , type='line',x0=0.4,x1=1,y0=1,y1=1,line=list(color='white')),
+list(layer='below' , type='line',x0=0.4,x1=1,y0=0,y1=0,line=list(color='white')),
+list(layer='below' , type='line',x0=1,x1=1,y0=0,y1=1,line=list(color='white')),
+list(layer='below' , type='line',x0=0.825,x1=0.825,y0=0.2,y1=0.8,line=list(color='white')),
+list(layer='below' , type='line',x0=0.5,x1=0.5,y0=0,y1=1,line=list(color='white')),
+list(layer='below' , type='circle',x0=0.45,x1=0.55,y0=0.4,y1=0.6,line=list(color='white'))
+))
+
+fig <- subplot(GOAL, NOGOAL) %>% 
+  layout(title = 'Goals and No Goals',legend= list(orientation='h'))
+config(fig , displayModeBar = FALSE)
+```
+
+    
