@@ -1,8 +1,7 @@
 ---
 title: "XG(Expected Goal) in Fifaonlie4"
 output:
-  html_document:
-    df_print: paged
+  html_document: rmarkdown::github_document
 ---
 
 
