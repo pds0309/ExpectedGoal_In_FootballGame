@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Get ExpectedGoal Prob Api'
+Globals:
+  Function:
+    Timeout: 60
+Resources:
+  XgRfPredictProbApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: code/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      MemorySize: 1024
+      Role: arn:aws:iam::XXXXXXX:role/lambdacanreads3
+      Environment:
+        Variables:
+          s3_bucket: py-xg-mlmodel-bucket
+          model_name: pickle_XG.p
+      Events:
+        XgRfPredictProb:
+          Type: Api
+          Properties:
+            Path: /xgrf
+            Method: post
+Outputs:
+  XgRfPredictProbApi:
+    Description: API Gateway endpoint URL for Prod stage for WineClassifier function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/xgrf/
